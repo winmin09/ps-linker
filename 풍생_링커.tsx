@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  MessageSquare, Home, HeartHandshake, User, Plus, Search, ShieldAlert, 
+  MessageSquare, Home, HeartHandshake, User, Plus, Search, ShieldAlert,  
   Clock, Send, Image as ImageIcon, MoreVertical, Award, AlertTriangle, 
   CheckCircle2, Calendar, MapPin, Phone, Info, Sparkles, ChevronRight, 
   Filter, Flame, Sprout, Crown, Lock, X, ThumbsUp, HelpCircle, RefreshCw,
