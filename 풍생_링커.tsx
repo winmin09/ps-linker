@@ -1,0 +1,2046 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { 
+  MessageSquare, Home, HeartHandshake, User, Plus, Search, ShieldAlert, 
+  Clock, Send, Image as ImageIcon, MoreVertical, Award, AlertTriangle, 
+  CheckCircle2, Calendar, MapPin, Phone, Info, Sparkles, ChevronRight, 
+  Filter, Flame, Sprout, Crown, Lock, X, ThumbsUp, HelpCircle, RefreshCw,
+  LogOut, ShieldCheck, FileText, Bell, Eye, EyeOff, Edit3, Trash2,
+  Trophy, Zap, Calculator, Check, Bookmark, Smile, Frown, Meh, UserCheck,
+  Mail, KeyRound, ArrowRight, AlertCircle, SearchCode
+} from 'lucide-react';
+
+// ==========================================
+// CONSTANTS & MOCK DATA
+// ==========================================
+
+const ALLOWED_DOMAINS = ['@ps.hs.kr', '@gmail.com'];
+
+const CATEGORIES = {
+  COUNSEL: { id: 'COUNSEL', name: '고민상담', max: 2, limitHours: 48, badgeColor: 'bg-rose-100 text-rose-700 border-rose-200', desc: '1:1 비밀 밀착 고민 나누기' },
+  STUDY: { id: 'STUDY', name: '학업/질문', max: 20, limitHours: 120, badgeColor: 'bg-blue-100 text-blue-700 border-blue-200', desc: '내신/수능 같이 공부하기' },
+  HOBBY: { id: 'HOBBY', name: '친목/취미', max: 20, limitHours: 120, badgeColor: 'bg-emerald-100 text-emerald-700 border-emerald-200', desc: '운동, 게임, 동아리 수다' },
+  SDGS: { id: 'SDGS', name: 'SDGs/교내협력', max: 20, limitHours: 120, badgeColor: 'bg-amber-100 text-amber-800 border-amber-200', desc: 'SDGs 17번 교내 연대 프로젝트' },
+  RECRUIT: { id: 'RECRUIT', name: '팀원모집', max: 10, limitHours: 72, badgeColor: 'bg-purple-100 text-purple-700 border-purple-200', desc: '수행평가 모둠 & 동아리 모집' }
+};
+
+// 수학 기호 패드 카테고리
+const MATH_SYMBOL_CATEGORIES = {
+  CALCULUS: { 
+    name: '미적분/수II', 
+    symbols: ['x²', 'xⁿ', '√x', 'lim', "f'(x)", '∫', 'Σ', 'log', 'ln', 'dx/dy'] 
+  },
+  BASIC: { 
+    name: '기본 기호', 
+    symbols: ['+', '-', '×', '÷', '±', '=', '≠', '≈', '≤', '≥', '∞'] 
+  },
+  TRIG_GREEK: { 
+    name: '삼각/라틴', 
+    symbols: ['sin', 'cos', 'tan', 'π', 'θ', 'Δ', 'α', 'β', 'Ω'] 
+  },
+  FORMULAS: { 
+    name: '공식 템플릿', 
+    symbols: ['$\\lim_{x \\to 0}$', "$f'(x) = L$", '$\\int f(x) dx$', '$a^2 + b^2 = c^2$'] 
+  }
+};
+
+// 테스트용 베타 계정 목록
+const BETA_ACCOUNTS = [
+  {
+    id: 'u-1',
+    email: 'student1@ps.hs.kr',
+    nickname: '푸른풍생인',
+    temperature: 36.5,
+    role: '학생 (기본)',
+    badges: [{ id: 'b1', name: '초보 멘토', emoji: '🌱', desc: '온도 36.5℃ 달성' }]
+  },
+  {
+    id: 'u-2',
+    email: 'study_mentor@ps.hs.kr',
+    nickname: '수학마스터',
+    temperature: 42.0,
+    role: '학업 멘토',
+    badges: [
+      { id: 'b2', name: '열정 멘토', emoji: '🔥', desc: '온도 40.0℃ 달성' },
+      { id: 'b3', name: '📐 수학 해결사', emoji: '📐', desc: '수학 질문 10회 이상 답변' }
+    ]
+  },
+  {
+    id: 'u-3',
+    email: 'sdg_hero@ps.hs.kr',
+    nickname: '지구수호자',
+    temperature: 46.5,
+    role: 'SDGs 수호신',
+    badges: [
+      { id: 'b4', name: '풍생 수호신', emoji: '👑', desc: '온도 45.0℃ 이상 달성' },
+      { id: 'b5', name: '🌿 지구 파수꾼', emoji: '🌿', desc: 'SDGs 교내 프로젝트 참여' }
+    ]
+  },
+  {
+    id: 'u-4',
+    email: 'wee_counselor@ps.hs.kr',
+    nickname: 'Wee상담선생님',
+    temperature: 50.0,
+    role: '교내 전문상담사',
+    badges: [
+      { id: 'b6', name: '💚 공감의 달인', emoji: '💚', desc: '교내 비밀 상담 제공' }
+    ]
+  }
+];
+
+const PROFANITY_LIST = [
+  '바보', '멍청이', '시발', '씨발', '개새끼', '존나', '병신', 'fuck', 'shit', '지랄', 
+  '꺼져', '새끼', '쓰레기', 'ㅅㅂ', 'ㅂㅅ', 'ㅈㄴ', 'ㄲㅈ', 'ㅗ', '미친', '좆', '18놈', 
+  '닥쳐', '엠창', '느금', '애자', '씨부랄', '족같'
+];
+
+const INITIAL_ROOMS = [
+  {
+    id: 'room-1',
+    title: '진로 문제 때문에 요즘 너무 불안하고 힘들어요...',
+    category: 'COUNSEL',
+    creator: '방랑하는풍생인',
+    membersCount: 2,
+    lastMessageAt: Date.now() - 3 * 3600 * 1000,
+    createdAt: Date.now() - 5 * 3600 * 1000,
+    messages: [
+      { id: 'm1', sender: '방랑하는풍생인', text: '안녕하세요... 적성이랑 성적 고민이 커요.', timestamp: Date.now() - 4 * 3600 * 1000, isSystem: false },
+      { id: 'm2', sender: '수학마스터', text: '선배로서 적성을 먼저 탐색하길 권해! $\\lim_{x \\to 1} F(x) = L$ 처럼 방향 설정이 중요해.', timestamp: Date.now() - 3.5 * 3600 * 1000, isSystem: false },
+    ]
+  },
+  {
+    id: 'room-2',
+    title: '수학 II 미분가능성 심화 공식 같이 정리해요!',
+    category: 'STUDY',
+    creator: '수학마스터',
+    membersCount: 7,
+    lastMessageAt: Date.now() - 12 * 3600 * 1000,
+    createdAt: Date.now() - 24 * 3600 * 1000,
+    messages: [
+      { id: 'm10', sender: '수학마스터', text: '미분계수 정의: $f\'(a) = \\lim_{h \\to 0} \\frac{f(a+h)-f(a)}{h}$ 공식 체크하세요!', timestamp: Date.now() - 15 * 3600 * 1000, isSystem: false },
+      { id: 'm11', sender: '푸른풍생인', text: '```js\nfunction checkDiff(a, h) {\n  return (f(a+h) - f(a)) / h;\n}\n``` 코드로 보니까 확 이해되네요!', timestamp: Date.now() - 12 * 3600 * 1000, isSystem: false }
+    ]
+  },
+  {
+    id: 'room-3',
+    title: '[SDGs] 환경 기후위기 대응 캠페인 아이디어',
+    category: 'SDGS',
+    creator: '지구수호자',
+    membersCount: 9,
+    lastMessageAt: Date.now() - 2 * 3600 * 1000,
+    createdAt: Date.now() - 48 * 3600 * 1000,
+    messages: [
+      { id: 'm30', sender: '지구수호자', text: '교내 텀블러 사용 캠페인 아이디어 공유해요!', timestamp: Date.now() - 2 * 3600 * 1000, isSystem: false }
+    ]
+  }
+];
+
+const INITIAL_LOST_ITEMS = [
+  { id: 'l1', title: '2층 체육관 입구에서 검은색 에어팟 케이스 습득', location: '본관 2층 체육관 B코트', date: '오늘 3교시 후', status: '보관중' },
+  { id: 'l2', title: '3학년 계단에서 분실된 샤프 주웠습니다', location: '본관 중앙계단 3층', date: '어제 방과후', status: '주인찾음' }
+];
+
+export default function App() {
+  // --- Auth State ---
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sentCode, setSentCode] = useState(null);
+  const [authStep, setAuthStep] = useState(1); // 1: Email Input, 2: Code Check, 3: Nickname
+  const [authNickname, setAuthNickname] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // EmailJS Direct Gmail Integration Config
+  const [emailJsConfig, setEmailJsConfig] = useState({
+    serviceId: 'service_poongsaeng',
+    templateId: 'template_linker_auth',
+    publicKey: 'YOUR_EMAILJS_PUBLIC_KEY'
+  });
+
+  // Simulated Webmail Inbox State
+  const [simulatedEmails, setSimulatedEmails] = useState([]);
+  const [showWebmailModal, setShowWebmailModal] = useState(false);
+
+  // --- Current User State ---
+  const [currentUser, setCurrentUser] = useState({
+    id: 'u-1',
+    email: 'student1@ps.hs.kr',
+    nickname: '푸른풍생인',
+    temperature: 36.5,
+    role: '학생 (기본)',
+    reportsCount: 0,
+    profanityWarnings: 0,
+    evaluatedUsers: {},
+    bookings: [],
+    badges: [
+      { id: 'b1', name: '초보 멘토', emoji: '🌱', desc: '온도 36.5℃ 달성' }
+    ]
+  });
+
+  // UI Tabs & Views
+  const [activeTab, setActiveTab] = useState('home'); // home | chats | lostfound | wee | mypage
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeRoomId, setActiveRoomId] = useState(null);
+
+  // Data & Settings
+  const [rooms, setRooms] = useState(INITIAL_ROOMS);
+  const [lostItems, setLostItems] = useState(INITIAL_LOST_ITEMS);
+
+  // Modals
+  const [showBetaAccountModal, setShowBetaAccountModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newRoomTitle, setNewRoomTitle] = useState('');
+  const [newRoomCategory, setNewRoomCategory] = useState('COUNSEL');
+
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('욕설/비하');
+
+  const [showWeeBookingModal, setShowWeeBookingModal] = useState(false);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [matchSubject, setMatchSubject] = useState('수학II');
+
+  const [showLostPostModal, setShowLostPostModal] = useState(false);
+  const [lostForm, setLostForm] = useState({ title: '', location: '', date: '' });
+
+  const [profanityFilterMode, setProfanityFilterMode] = useState('BLOCK');
+  const [showProfanityWarningModal, setShowProfanityWarningModal] = useState(false);
+  const [detectedBadWords, setDetectedBadWords] = useState([]);
+
+  // User Profile Rating Modal State
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [targetProfileUser, setTargetProfileUser] = useState(null);
+
+  const [toastMessage, setToastMessage] = useState(null);
+
+  // Math Keyboard State
+  const [showMathKeyboard, setShowMathKeyboard] = useState(false);
+  const [selectedMathCategory, setSelectedMathCategory] = useState('CALCULUS');
+
+  // Pomodoro Timer State
+  const [isPomodoroActive, setIsPomodoroActive] = useState(false);
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60);
+
+  // Refs
+  const messagesEndRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+
+  // Long-press message actions
+  const [selectedMsgForAction, setSelectedMsgForAction] = useState(null);
+  const [showMsgActionModal, setShowMsgActionModal] = useState(false);
+  const [showEditMsgModal, setShowEditMsgModal] = useState(false);
+  const [editMsgText, setEditMsgText] = useState('');
+
+  // Chat message input state
+  const [chatInputText, setChatInputText] = useState('');
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageBlurGuard, setImageBlurGuard] = useState(true);
+
+  // Toast Trigger Helper
+  const triggerToast = (text, type = 'info') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  // Switch Beta Account Helper
+  const handleSwitchBetaAccount = (acc) => {
+    setCurrentUser({
+      id: acc.id,
+      email: acc.email,
+      nickname: acc.nickname,
+      temperature: acc.temperature,
+      role: acc.role,
+      reportsCount: 0,
+      profanityWarnings: 0,
+      evaluatedUsers: {},
+      bookings: [],
+      badges: acc.badges || []
+    });
+    setIsLoggedIn(true);
+    setShowBetaAccountModal(false);
+    triggerToast(`🧪 [${acc.nickname}] (${acc.role}) 계정으로 스위칭 되었습니다.`, 'info');
+  };
+
+  // Create Room Helper
+  const handleCreateRoom = (e) => {
+    e.preventDefault();
+    if (!newRoomTitle.trim()) return;
+
+    const { cleanText, isFiltered, foundWords } = filterText(newRoomTitle);
+    if (isFiltered && profanityFilterMode === 'BLOCK') {
+      setDetectedBadWords(foundWords);
+      setShowProfanityWarningModal(true);
+      return;
+    }
+
+    const newRoom = {
+      id: `room-${Date.now()}`,
+      title: cleanText,
+      category: newRoomCategory,
+      creator: currentUser.nickname,
+      membersCount: 1,
+      lastMessageAt: Date.now(),
+      createdAt: Date.now(),
+      messages: [
+        { id: `m-${Date.now()}`, sender: '시스템', text: `🎉 '${cleanText}' 대화방이 개설되었습니다.`, timestamp: Date.now(), isSystem: true }
+      ]
+    };
+
+    setRooms([newRoom, ...rooms]);
+    setNewRoomTitle('');
+    setShowCreateModal(false);
+    setActiveRoomId(newRoom.id);
+    triggerToast(`💬 '${cleanText}' 대화방이 생성되었습니다!`, 'success');
+  };
+
+  // Handle Login Step 1: Request Code
+  const handleRequestAuthCode = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setIsSendingEmail(true);
+
+    const cleanEmail = loginEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setAuthError('이메일 주소를 입력해 주세요.');
+      setIsSendingEmail(false);
+      return;
+    }
+
+    const isValidDomain = ALLOWED_DOMAINS.some(domain => cleanEmail.endsWith(domain));
+    if (!isValidDomain) {
+      setAuthError(`허용된 이메일 도메인(${ALLOWED_DOMAINS.join(', ')})으로만 접속할 수 있습니다.`);
+      setIsSendingEmail(false);
+      return;
+    }
+
+    // Generate dynamic 6-digit code
+    const generatedCode = String(Math.floor(100000 + Math.random() * 900000));
+    setSentCode(generatedCode);
+
+    // Try sending real email via EmailJS REST API
+    try {
+      const response = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: emailJsConfig.serviceId,
+          template_id: emailJsConfig.templateId,
+          user_id: emailJsConfig.publicKey,
+          template_params: {
+            to_email: cleanEmail,
+            verification_code: generatedCode,
+            user_name: cleanEmail.split('@')[0]
+          }
+        })
+      });
+
+      if (response.ok) {
+        triggerToast(`📧 [${cleanEmail}] 실제 Gmail 수신함으로 인증번호가 전송되었습니다!`, 'success');
+      } else {
+        triggerToast(`📧 Gmail API 연동 시도 완료! (수신함 보기 모달로도 확인 가능합니다)`, 'info');
+      }
+    } catch (err) {
+      triggerToast(`📧 [${cleanEmail}] 인증 발송 완료 (수신함 모달 백업 지원)`, 'info');
+    } finally {
+      setIsSendingEmail(false);
+    }
+
+    // Create backup entry in simulated inbox
+    const newEmail = {
+      id: Date.now(),
+      to: cleanEmail,
+      sender: 'auth-verify@ps.hs.kr',
+      senderName: '풍생고 웹메일 인증센터',
+      subject: '[풍생 링커] 교내 본인인증 6자리 인증코드 발송',
+      code: generatedCode,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+
+    setSimulatedEmails(prev => [newEmail, ...prev]);
+    setAuthStep(2);
+    setShowWebmailModal(true);
+  };
+
+  // Handle Login Step 2: Verify Code
+  const handleVerifyAuthCode = (e) => {
+    e.preventDefault();
+    setAuthError('');
+
+    if (verificationCode.trim() !== sentCode) {
+      setAuthError('인증 코드가 올바르지 않습니다. 수신함의 6자리 코드를 확인하세요.');
+      return;
+    }
+
+    setAuthStep(3);
+    triggerToast('✅ 이메일 본인 소속 검증이 완료되었습니다! 익명 닉네임을 설정하세요.', 'success');
+  };
+
+  // Handle Login Step 3: Set Anonymous Nickname & Complete Login
+  const handleCompleteRegistration = (e) => {
+    e.preventDefault();
+    setAuthError('');
+
+    const nick = authNickname.trim();
+    if (!nick) {
+      setAuthError('익명 닉네임을 입력해 주세요.');
+      return;
+    }
+
+    // Check profanity in nickname
+    const { isFiltered } = filterText(nick);
+    if (isFiltered) {
+      setAuthError('닉네임에 비속어나 부적절한 단어가 포함되어 있습니다.');
+      return;
+    }
+
+    // Complete Auth
+    const newUser = {
+      id: `u-${Date.now()}`,
+      email: loginEmail.trim().toLowerCase(),
+      nickname: nick,
+      temperature: 36.5,
+      role: '학생 (인증됨)',
+      reportsCount: 0,
+      profanityWarnings: 0,
+      evaluatedUsers: {},
+      bookings: [],
+      badges: [{ id: 'b1', name: '초보 멘토', emoji: '🌱', desc: '온도 36.5℃ 달성' }]
+    };
+
+    setCurrentUser(newUser);
+    setIsLoggedIn(true);
+    triggerToast(`🎉 환영합니다, ${nick}님! 익명 소통이 활성화되었습니다.`, 'success');
+  };
+
+  // Math symbol insert
+  const handleInsertMathSymbol = (symbol) => {
+    setChatInputText(prev => {
+      const needsSpace = prev && !prev.endsWith(' ');
+      return prev + (needsSpace ? ' ' : '') + symbol + ' ';
+    });
+  };
+
+  // Pomodoro countdown timer effect
+  useEffect(() => {
+    let interval = null;
+    if (isPomodoroActive && pomodoroSeconds > 0) {
+      interval = setInterval(() => setPomodoroSeconds(s => s - 1), 1000);
+    } else if (pomodoroSeconds === 0) {
+      setIsPomodoroActive(false);
+      triggerToast('🔔 뽀모도로 25분 스터디 완료! 5분 휴식을 취하세요.', 'success');
+      setPomodoroSeconds(25 * 60);
+    }
+    return () => clearInterval(interval);
+  }, [isPomodoroActive, pomodoroSeconds]);
+
+  // Auto scroll chat
+  useEffect(() => {
+    if (activeRoomId) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeRoomId, rooms]);
+
+  // Long-press handler (1.1 seconds)
+  const handlePressStart = (msg) => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setSelectedMsgForAction(msg);
+      setShowMsgActionModal(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 1100);
+  };
+
+  const handlePressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // Profanity & bypass filter
+  const filterText = (text) => {
+    let clean = text;
+    let isFiltered = false;
+    const foundWords = [];
+
+    PROFANITY_LIST.forEach(word => {
+      const chars = Array.from(word).map(c => c.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+      const regexPattern = chars.join('[\\d\\W_]*');
+      const regex = new RegExp(regexPattern, 'gi');
+
+      const matches = clean.match(regex);
+      if (matches) {
+        matches.forEach(m => {
+          if (!foundWords.includes(m)) foundWords.push(m);
+        });
+        clean = clean.replace(regex, (match) => '*'.repeat(match.length));
+        isFiltered = true;
+      }
+    });
+
+    return { cleanText: clean, isFiltered, foundWords };
+  };
+
+  // Remaining time calculator
+  const calculateRemainingTime = (lastMessageAt, categoryKey) => {
+    const category = CATEGORIES[categoryKey] || CATEGORIES.STUDY;
+    const limitMs = category.limitHours * 3600 * 1000;
+    const elapsed = Date.now() - lastMessageAt;
+    const remainingMs = limitMs - elapsed;
+
+    if (remainingMs <= 0) {
+      return { text: '⏱️ 최근 대화가 없어 폭파됨', isExpired: true };
+    }
+
+    const remainingHours = Math.floor(remainingMs / (3600 * 1000));
+    const remainingMins = Math.floor((remainingMs % (3600 * 1000)) / (60 * 1000));
+
+    if (remainingHours >= 24) {
+      const days = Math.floor(remainingHours / 24);
+      const hours = remainingHours % 24;
+      return { text: `⏱️ ${days}일 ${hours}시간 후 폭파 예정`, isExpired: false };
+    }
+
+    return { text: `⏱️ ${remainingHours}시간 ${remainingMins}분 후 폭파 예정`, isExpired: false };
+  };
+
+  // Badge tier calculator
+  const getMentorBadge = (temp) => {
+    if (temp >= 45.0) {
+      return { title: '풍생 수호신', emoji: '👑', color: 'bg-amber-100 text-amber-800 border-amber-300' };
+    } else if (temp >= 40.0) {
+      return { title: '열정 멘토', emoji: '🔥', color: 'bg-orange-100 text-orange-800 border-orange-300' };
+    }
+    return { title: '초보 멘토', emoji: '🌱', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+  };
+
+  // Direct Profile Rating Handler
+  const handleProfileRating = (amount, reasonLabel) => {
+    if (!targetProfileUser) return;
+    
+    const now = Date.now();
+    const lastEvalTime = currentUser.evaluatedUsers[targetProfileUser.nickname];
+
+    if (lastEvalTime && now - lastEvalTime < 24 * 3600 * 1000) {
+      triggerToast('⚠️ 동일 유저 간에는 24시간 내 1회만 온도 평가가 가능합니다.', 'warning');
+      return;
+    }
+
+    setCurrentUser(prev => ({
+      ...prev,
+      evaluatedUsers: {
+        ...prev.evaluatedUsers,
+        [targetProfileUser.nickname]: now
+      }
+    }));
+
+    setShowUserProfileModal(false);
+    triggerToast(`🌡️ [${targetProfileUser.nickname}] 님의 매너 온도가 ${amount}℃ 올랐습니다! (${reasonLabel})`, 'success');
+  };
+
+  // 1-Second Quick Mentor Match
+  const handleStartQuickMatch = () => {
+    setShowMatchModal(false);
+    const newRoom = {
+      id: `room-match-${Date.now()}`,
+      title: `⚡ [1초 멘토 매칭] ${matchSubject} 과목 긴급 질문방`,
+      category: 'STUDY',
+      creator: currentUser.nickname,
+      membersCount: 2,
+      lastMessageAt: Date.now(),
+      createdAt: Date.now(),
+      messages: [
+        { id: `m-${Date.now()}`, sender: '시스템', text: `✨ [${matchSubject}] 매칭 성공! 질문을 편하게 남겨주세요.`, timestamp: Date.now(), isSystem: true },
+        { id: `m-bot-${Date.now()}`, sender: `${matchSubject}열정멘토`, text: `안녕하세요! ${matchSubject} 과목 어떤 도움이 필요하신가요?`, timestamp: Date.now() + 500, isSystem: false }
+      ]
+    };
+    setRooms([newRoom, ...rooms]);
+    setActiveRoomId(newRoom.id);
+    triggerToast(`⚡ ${matchSubject} 과목 멘토와 1초 매칭이 완료되었습니다!`, 'success');
+  };
+
+  // Send Chat Message
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!chatInputText.trim() && !imagePreview) return;
+
+    const { cleanText, isFiltered, foundWords } = filterText(chatInputText);
+
+    if (isFiltered && profanityFilterMode === 'BLOCK') {
+      setDetectedBadWords(foundWords);
+      setShowProfanityWarningModal(true);
+      triggerToast('🚨 비속어/우회어 감지로 메시지 전송이 차단되었습니다.', 'danger');
+      return;
+    }
+
+    const now = Date.now();
+    const newMsg = {
+      id: `m-${now}`,
+      sender: currentUser.nickname,
+      text: cleanText,
+      image: imagePreview,
+      timestamp: now,
+      isSystem: false
+    };
+
+    setRooms(prevRooms => prevRooms.map(r => {
+      if (r.id === activeRoomId) {
+        return {
+          ...r,
+          lastMessageAt: now,
+          messages: [...r.messages, newMsg]
+        };
+      }
+      return r;
+    }));
+
+    setChatInputText('');
+    setImagePreview(null);
+  };
+
+  // Handle Image Upload
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      triggerToast('이미지 용량은 최대 5MB까지 지원됩니다.', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target.result);
+      triggerToast('이미지가 첨부되었습니다.', 'info');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Open User Profile Modal
+  const handleOpenUserProfile = (senderNickname) => {
+    if (senderNickname === currentUser.nickname) {
+      setActiveTab('mypage');
+      return;
+    }
+    setTargetProfileUser({
+      nickname: senderNickname,
+      temperature: 38.5,
+      role: '또래 풍생인'
+    });
+    setShowUserProfileModal(true);
+  };
+
+  // Filtered rooms
+  const filteredRooms = useMemo(() => {
+    return rooms.filter(room => {
+      if (selectedCategory !== 'ALL' && room.category !== selectedCategory) return false;
+      if (searchQuery.trim() && !room.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      const { isExpired } = calculateRemainingTime(room.lastMessageAt, room.category);
+      return !isExpired;
+    });
+  }, [rooms, selectedCategory, searchQuery]);
+
+  const activeRoom = rooms.find(r => r.id === activeRoomId);
+  const userMessageCountInActiveRoom = activeRoom ? activeRoom.messages.filter(m => !m.isSystem).length : 0;
+  const isRatingUnlocked = userMessageCountInActiveRoom >= 5;
+  const userBadge = getMentorBadge(currentUser.temperature);
+
+  // Message Renderer with Math & Code Block Support
+  const renderFormattedText = (text) => {
+    if (!text) return null;
+
+    if (text.includes('```')) {
+      const parts = text.split('```');
+      return (
+        <div className="space-y-1">
+          {parts.map((part, i) => {
+            if (i % 2 === 1) {
+              return (
+                <pre key={i} className="bg-slate-900 text-emerald-400 p-2.5 rounded-lg text-[11px] font-mono overflow-x-auto border border-slate-700">
+                  <code>{part.trim()}</code>
+                </pre>
+              );
+            }
+            return part ? <p key={i}>{part}</p> : null;
+          })}
+        </div>
+      );
+    }
+
+    if (text.includes('$')) {
+      const parts = text.split('$');
+      return (
+        <span>
+          {parts.map((part, i) => {
+            if (i % 2 === 1) {
+              return (
+                <span key={i} className="inline-block px-2 py-0.5 bg-amber-100 text-amber-900 rounded font-mono font-bold text-[11px] border border-amber-300 mx-0.5 shadow-sm">
+                  {part}
+                </span>
+              );
+            }
+            return part;
+          })}
+        </span>
+      );
+    }
+
+    return text;
+  };
+
+  // =========================================================
+  // RENDER: LOGIN SCREEN (If not logged in)
+  // =========================================================
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-800 flex justify-center items-center font-sans p-4 antialiased">
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 border border-slate-200 space-y-6 relative overflow-hidden">
+          
+          {/* Header Banner */}
+          <div className="text-center space-y-2 pt-2">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center text-white mx-auto shadow-lg shadow-teal-200">
+              <HeartHandshake className="w-9 h-9" />
+            </div>
+            <h1 className="font-black text-2xl text-slate-900 tracking-tight">풍생 링커</h1>
+            <p className="text-xs text-teal-700 font-extrabold bg-teal-50 inline-block px-3 py-1 rounded-full border border-teal-200">
+              UN SDGs 17 교내 익명 또래 협력 플랫폼
+            </p>
+          </div>
+
+          {/* Quick Beta Test Button */}
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              <span className="font-bold text-purple-900">빠른 기능 테스트</span>
+            </div>
+            <button 
+              onClick={() => setShowBetaAccountModal(true)}
+              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-xl shadow-md transition text-xs"
+            >
+              🧪 베타 계정으로 바로 체험
+            </button>
+          </div>
+
+          {/* Authentication Form Steps */}
+          <div className="space-y-4 pt-1">
+            {/* Step Indicators */}
+            <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-400">
+              <span className={`px-2.5 py-0.5 rounded-full ${authStep === 1 ? 'bg-teal-600 text-white' : 'bg-slate-100'}`}>1. 이메일</span>
+              <span>→</span>
+              <span className={`px-2.5 py-0.5 rounded-full ${authStep === 2 ? 'bg-teal-600 text-white' : 'bg-slate-100'}`}>2. 코드검증</span>
+              <span>→</span>
+              <span className={`px-2.5 py-0.5 rounded-full ${authStep === 3 ? 'bg-teal-600 text-white' : 'bg-slate-100'}`}>3. 익명닉네임</span>
+            </div>
+
+            {/* ERROR ALERT */}
+            {authError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-rose-700 text-xs font-semibold animate-shake">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            {/* STEP 1: EMAIL INPUT */}
+            {authStep === 1 && (
+              <form onSubmit={handleRequestAuthCode} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                    이메일 주소 (@ps.hs.kr 또는 @gmail.com) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="email" 
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="user@gmail.com 또는 user@ps.hs.kr"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-3 text-xs text-slate-900 font-medium focus:outline-none focus:border-teal-500 transition"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 pl-1">
+                    💡 실제 테스트용 <strong className="text-teal-600">@gmail.com</strong> 주소를 입력하시면 해당 Gmail로 인증 코드가 발송됩니다.
+                  </p>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={isSendingEmail}
+                  className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSendingEmail ? (
+                    <span>Gmail로 발송 중...</span>
+                  ) : (
+                    <>
+                      <span>Gmail로 인증코드 받기</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2: VERIFICATION CODE */}
+            {authStep === 2 && (
+              <form onSubmit={handleVerifyAuthCode} className="space-y-3.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-extrabold text-slate-700">
+                      6자리 인증코드 입력 <span className="text-rose-500">*</span>
+                    </label>
+                    <button 
+                      type="button"
+                      onClick={() => setShowWebmailModal(true)}
+                      className="text-[11px] font-bold text-teal-600 hover:text-teal-800 flex items-center gap-1 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200"
+                    >
+                      <span>📬 교내 메일함 열기</span>
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="text" 
+                      maxLength={6}
+                      value={verificationCode}
+                      onChange={(e) => setVerificationCode(e.target.value)}
+                      placeholder="수신함에 발송된 6자리 코드"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-3 text-xs text-slate-900 font-mono font-bold tracking-widest focus:outline-none focus:border-teal-500 transition"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-teal-700 font-medium mt-1 pl-1">
+                    💡 <strong>{loginEmail}</strong> (으)로 보낸 메일을 확인하려면 위 <u>[📬 교내 메일함 열기]</u> 버튼을 누르세요.
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setAuthStep(1)}
+                    className="py-3 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs"
+                  >
+                    이전
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition"
+                  >
+                    인증 확인
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 3: ANONYMOUS NICKNAME */}
+            {authStep === 3 && (
+              <form onSubmit={handleCompleteRegistration} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-extrabold text-slate-700 mb-1">
+                    사용할 익명 닉네임 <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={authNickname}
+                      onChange={(e) => setAuthNickname(e.target.value)}
+                      placeholder="예: 푸른풍생인, 수학왕"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-teal-500 transition"
+                      required
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-700 font-medium mt-1 pl-1">
+                    🛡️ 실명 및 비속어 사용이 금지됩니다. (DB strict data isolation)
+                  </p>
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition"
+                >
+                  풍생 링커 시작하기 🚀
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* SIMULATED WEBMAIL MODAL */}
+          {showWebmailModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-teal-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2 text-teal-700">
+                    <Mail className="w-5 h-5" />
+                    <h3 className="font-extrabold text-base text-slate-900">📬 교내 메일함 (@ps.hs.kr)</h3>
+                  </div>
+                  <button onClick={() => setShowWebmailModal(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    수신자: <strong className="text-slate-800">{loginEmail || '교내 계정'}</strong>
+                  </p>
+
+                  {simulatedEmails.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
+                      수신된 인증 메일이 없습니다.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-60 overflow-y-auto">
+                      {simulatedEmails.map((mail) => (
+                        <div key={mail.id} className="p-3.5 bg-teal-50/70 border border-teal-200 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500">
+                            <span className="font-bold text-teal-800">{mail.senderName}</span>
+                            <span>{mail.time}</span>
+                          </div>
+                          <h4 className="font-extrabold text-xs text-slate-900">{mail.subject}</h4>
+                          <div className="p-2.5 bg-white border border-teal-100 rounded-lg text-center space-y-1">
+                            <p className="text-[10px] text-slate-500">인증번호 6자리</p>
+                            <p className="text-lg font-black font-mono text-teal-700 tracking-widest">{mail.code}</p>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              setVerificationCode(mail.code);
+                              setShowWebmailModal(false);
+                              triggerToast('✅ 인증번호가 입력창에 자동으로 입력되었습니다!', 'success');
+                            }}
+                            className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-lg text-xs shadow-md transition"
+                          >
+                            ⚡ 인증코드 자동 입력하기
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button 
+                  onClick={() => setShowWebmailModal(false)}
+                  className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* BETA ACCOUNT SWITCHER MODAL */}
+          {showBetaAccountModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-purple-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2 text-purple-700">
+                    <UserCheck className="w-5 h-5" />
+                    <h3 className="font-extrabold text-base text-slate-900">테스트용 베타 계정 선택</h3>
+                  </div>
+                  <button onClick={() => setShowBetaAccountModal(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {BETA_ACCOUNTS.map((acc) => (
+                    <button
+                      key={acc.id}
+                      onClick={() => handleSwitchBetaAccount(acc)}
+                      className={`w-full p-3 rounded-xl border text-left flex items-center justify-between transition ${
+                        currentUser.nickname === acc.nickname 
+                          ? 'bg-purple-100 border-purple-400 text-purple-900 font-bold' 
+                          : 'bg-slate-50 border-slate-200 hover:bg-purple-50 text-slate-800'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-xs">{acc.nickname}</span>
+                          <span className="text-[10px] bg-white border px-1.5 py-0.5 rounded text-purple-700 font-semibold">{acc.role}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{acc.email}</p>
+                      </div>
+
+                      <span className="text-xs font-bold text-amber-600 font-mono">{acc.temperature}℃</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================
+  // MAIN APPLICATION SCREEN
+  // =========================================================
+  return (
+    <div className="min-h-screen bg-slate-100 text-slate-800 flex justify-center font-sans antialiased">
+      <div className="w-full max-w-md bg-white min-h-screen flex flex-col shadow-2xl relative pb-20 border-x border-slate-200">
+        
+        {/* TOAST NOTIFICATION */}
+        {toastMessage && (
+          <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full shadow-xl text-xs font-bold flex items-center gap-2 transition-all animate-bounce ${
+            toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : 
+            toastMessage.type === 'danger' ? 'bg-rose-600 text-white' : 
+            toastMessage.type === 'warning' ? 'bg-amber-500 text-white' : 'bg-slate-800 text-white'
+          }`}>
+            <Sparkles className="w-4 h-4" />
+            <span>{toastMessage.text}</span>
+          </div>
+        )}
+
+        {/* HEADER BAR */}
+        {!activeRoomId && (
+          <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-9 h-9 bg-teal-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-teal-200">
+                <HeartHandshake className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="font-black text-base text-slate-900 tracking-tight leading-none">풍생 링커</h1>
+                <p className="text-[10px] text-teal-700 font-bold mt-0.5">Poongsaeng Anonymous Platform</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button 
+                onClick={() => setShowBetaAccountModal(true)}
+                className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 text-[11px] font-extrabold rounded-lg border border-purple-200 transition flex items-center gap-1"
+              >
+                <span>🧪 베타계정</span>
+              </button>
+              <button 
+                onClick={() => setIsLoggedIn(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+                title="로그아웃"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </header>
+        )}
+
+        {/* MAIN BODY VIEW OR CHAT ROOM VIEW */}
+        {activeRoomId ? (
+          /* CHAT ROOM SCREEN */
+          <div className="flex-1 flex flex-col bg-slate-50 relative h-screen">
+            {/* CHAT HEADER */}
+            <div className="bg-white border-b border-slate-200 p-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setActiveRoomId(null)} className="p-1 text-slate-500 hover:text-slate-800 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${CATEGORIES[activeRoom.category].badgeColor}`}>
+                      {CATEGORIES[activeRoom.category].name}
+                    </span>
+                    <span className="text-[11px] font-extrabold text-amber-600">
+                      {calculateRemainingTime(activeRoom.lastMessageAt, activeRoom.category).text}
+                    </span>
+                  </div>
+                  <h2 className="font-bold text-xs text-slate-900 truncate max-w-[180px]">{activeRoom.title}</h2>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setActiveTab('wee')}
+                  className="px-2 py-1 bg-rose-50 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-200 flex items-center gap-1"
+                >
+                  <Phone className="w-3 h-3" />
+                  <span>Wee SOS</span>
+                </button>
+                <button onClick={() => setShowReportModal(true)} className="p-1.5 text-slate-400 hover:text-rose-600">
+                  <ShieldAlert className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* CHAT MESSAGES LIST */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3">
+              <div className="text-center my-2">
+                <span className="text-[10px] bg-slate-200 text-slate-600 px-3 py-1 rounded-full font-medium">
+                  🔒 이 대화방은 익명성이 보장되며 타이머 만료 시 자동 폭파됩니다.
+                </span>
+              </div>
+
+              {activeRoom.messages.map((msg) => {
+                const isMe = msg.sender === currentUser.nickname;
+                if (msg.isSystem) {
+                  return (
+                    <div key={msg.id} className="text-center my-2">
+                      <span className="text-[10px] bg-teal-50 text-teal-800 border border-teal-200 px-3 py-1 rounded-full font-bold">
+                        {msg.text}
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div 
+                    key={msg.id} 
+                    onMouseDown={() => handlePressStart(msg)}
+                    onMouseUp={handlePressEnd}
+                    onMouseLeave={handlePressEnd}
+                    onTouchStart={() => handlePressStart(msg)}
+                    onTouchEnd={handlePressEnd}
+                    className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} select-none`}
+                  >
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+                      <button 
+                        onClick={() => handleOpenUserProfile(msg.sender)}
+                        className="font-bold text-slate-700 hover:underline flex items-center gap-1"
+                      >
+                        <span>{msg.sender}</span>
+                        {isMe && <span className="text-teal-600 font-extrabold">(나)</span>}
+                      </button>
+                      <span>•</span>
+                      <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+
+                    <div className={`max-w-[80%] rounded-2xl p-3 text-xs shadow-sm leading-relaxed ${
+                      isMe ? 'bg-teal-600 text-white rounded-tr-none' : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                    }`}>
+                      {msg.image && (
+                        <img 
+                          src={msg.image} 
+                          alt="첨부 이미지" 
+                          className={`rounded-lg mb-2 max-h-48 object-cover border ${imageBlurGuard ? 'blur-sm hover:blur-none transition' : ''}`} 
+                        />
+                      )}
+                      {renderFormattedText(msg.text)}
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* MATH SYMBOL TOOLBAR */}
+            {showMathKeyboard && (
+              <div className="bg-slate-100 border-t border-slate-200 p-2 space-y-2 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                  <div className="flex items-center gap-1 overflow-x-auto">
+                    {Object.keys(MATH_SYMBOL_CATEGORIES).map(key => (
+                      <button
+                        key={key}
+                        onClick={() => setSelectedMathCategory(key)}
+                        className={`text-[10px] font-extrabold px-2 py-1 rounded-md transition ${
+                          selectedMathCategory === key ? 'bg-teal-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        {MATH_SYMBOL_CATEGORIES[key].name}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => setShowMathKeyboard(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-5 gap-1.5">
+                  {MATH_SYMBOL_CATEGORIES[selectedMathCategory].symbols.map((sym, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleInsertMathSymbol(sym)}
+                      className="bg-white hover:bg-teal-50 border border-slate-200 text-slate-800 font-mono text-xs py-1.5 rounded-lg font-bold shadow-sm transition active:scale-95 truncate"
+                    >
+                      {sym}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CHAT INPUT AREA */}
+            <div className="bg-white border-t border-slate-200 p-3 space-y-2">
+              {imagePreview && (
+                <div className="relative inline-block">
+                  <img src={imagePreview} alt="미리보기" className="w-16 h-16 object-cover rounded-xl border border-slate-300" />
+                  <button onClick={() => setImagePreview(null)} className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 shadow">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                <label className="p-2 text-slate-400 hover:text-slate-600 cursor-pointer rounded-xl bg-slate-100 hover:bg-slate-200">
+                  <ImageIcon className="w-4 h-4" />
+                  <input type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
+                </label>
+
+                <button 
+                  type="button" 
+                  onClick={() => setShowMathKeyboard(!showMathKeyboard)}
+                  className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center ${
+                    showMathKeyboard ? 'bg-teal-600 text-white' : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}
+                  title="수학 기호 입력 패드"
+                >
+                  <Calculator className="w-4 h-4" />
+                </button>
+
+                <input 
+                  type="text" 
+                  value={chatInputText}
+                  onChange={(e) => setChatInputText(e.target.value)}
+                  placeholder="메시지를 입력하세요 (롱프레스시 수정/삭제)" 
+                  className="flex-1 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-teal-500"
+                />
+
+                <button type="submit" className="p-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 shadow-md transition">
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          /* TAB VIEWS */
+          <div className="flex-1 p-4 space-y-5 overflow-y-auto">
+            {/* TAB 1: HOME */}
+            {activeTab === 'home' && (
+              <div className="space-y-4">
+                {/* SDGs Banner Card */}
+                <div className="bg-gradient-to-br from-teal-700 to-emerald-800 rounded-3xl p-5 text-white shadow-xl space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-widest bg-white/20 px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/20">
+                      SDGs 17 : 목표를 위한 파트너십
+                    </span>
+                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black tracking-tight">지구촌 연대를 학교에서 시작하다</h2>
+                    <p className="text-xs text-teal-100 mt-1">
+                      부담 없는 익명 소통으로 서로 돕고 성장을 나누는 풍생고만의 조력 커뮤니티
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between border-t border-white/10 text-xs">
+                    <div>
+                      <p className="text-[10px] text-teal-200">내 매너 온도</p>
+                      <p className="font-extrabold text-amber-300 font-mono text-base">{currentUser.temperature}℃ ({userBadge.title})</p>
+                    </div>
+                    <button 
+                      onClick={() => setShowCreateModal(true)}
+                      className="px-3 py-2 bg-white text-teal-900 font-extrabold rounded-xl shadow hover:bg-teal-50 transition flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>방 만들기</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 1-Second Quick Mentor Match Banner */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-4 text-white flex items-center justify-between shadow-lg">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full">모듈 1.1</span>
+                    <h3 className="font-extrabold text-sm">과목별 1초 멘토 매칭</h3>
+                    <p className="text-[11px] text-blue-100">질문이 생기면 기다림 없이 멘토와 즉시 연결됩니다.</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowMatchModal(true)}
+                    className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-900 font-black rounded-xl text-xs shadow transition flex items-center gap-1"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>매칭</span>
+                  </button>
+                </div>
+
+                {/* Active Rooms Quick Feed */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-extrabold text-sm text-slate-900">실시간 활성 대화방</h3>
+                    <button onClick={() => setActiveTab('chats')} className="text-xs text-teal-600 font-bold flex items-center gap-0.5">
+                      <span>전체보기</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {rooms.slice(0, 3).map(room => (
+                      <div 
+                        key={room.id} 
+                        onClick={() => setActiveRoomId(room.id)}
+                        className="p-3.5 bg-white rounded-2xl border border-slate-200 hover:border-teal-500 transition shadow-sm cursor-pointer space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${CATEGORIES[room.category].badgeColor}`}>
+                            {CATEGORIES[room.category].name}
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-bold">
+                            {calculateRemainingTime(room.lastMessageAt, room.category).text}
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-xs text-slate-900 truncate">{room.title}</h4>
+                        <div className="flex items-center justify-between text-[10px] text-slate-400">
+                          <span>참여 {room.membersCount}명</span>
+                          <span>최근 메시지 {new Date(room.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: CHATS LIST */}
+            {activeTab === 'chats' && (
+              <div className="space-y-3">
+                {/* Search & Filter Bar */}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="대화방 검색..." 
+                      className="w-full bg-slate-100 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800"
+                    />
+                  </div>
+                  <button 
+                    onClick={() => setShowCreateModal(true)}
+                    className="px-3 py-2 bg-teal-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>생성</span>
+                  </button>
+                </div>
+
+                {/* Category Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  <button 
+                    onClick={() => setSelectedCategory('ALL')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                      selectedCategory === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    전체
+                  </button>
+                  {Object.values(CATEGORIES).map(cat => (
+                    <button 
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                        selectedCategory === cat.id ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Rooms List */}
+                <div className="space-y-2.5">
+                  {filteredRooms.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+                      해당 조건의 대화방이 없습니다. 새 대화방을 개설해 보세요!
+                    </div>
+                  ) : (
+                    filteredRooms.map(room => (
+                      <div 
+                        key={room.id} 
+                        onClick={() => setActiveRoomId(room.id)}
+                        className="p-4 bg-white rounded-2xl border border-slate-200 hover:border-teal-500 transition shadow-sm cursor-pointer space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${CATEGORIES[room.category].badgeColor}`}>
+                            {CATEGORIES[room.category].name}
+                          </span>
+                          <span className="text-[10px] text-amber-600 font-extrabold font-mono">
+                            {calculateRemainingTime(room.lastMessageAt, room.category).text}
+                          </span>
+                        </div>
+
+                        <h4 className="font-extrabold text-sm text-slate-900 leading-snug">{room.title}</h4>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100">
+                          <span className="flex items-center gap-1">
+                            <User className="w-3.5 h-3.5" />
+                            <span>{room.creator}</span>
+                          </span>
+                          <span>최대 {CATEGORIES[room.category].max}명</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: LOST & FOUND */}
+            {activeTab === 'lostfound' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-extrabold text-base text-slate-900">익명 분실물 센터</h3>
+                    <p className="text-xs text-slate-500">교내에서 습득한 물건을 익명으로 찾아줍니다.</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowLostPostModal(true)}
+                    className="px-3 py-1.5 bg-teal-600 text-white font-extrabold rounded-xl text-xs shadow flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>등록</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2.5">
+                  {lostItems.map(item => (
+                    <div key={item.id} className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          item.status === '보관중' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {item.status}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{item.date}</span>
+                      </div>
+                      <h4 className="font-extrabold text-xs text-slate-900">{item.title}</h4>
+                      <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span>습득 장소: {item.location}</span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: WEE CLASS COUNSELING */}
+            {activeTab === 'wee' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-rose-500 to-pink-600 rounded-3xl p-5 text-white space-y-3 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-6 h-6" />
+                    <h2 className="font-black text-lg">교내 Wee클래스 (상담실)</h2>
+                  </div>
+                  <p className="text-xs text-rose-100 leading-relaxed">
+                    학업, 친구 관계, 심리적 불안감으로 도움이 필요할 때 비밀이 보장되는 교내 상담실과 연결됩니다.
+                  </p>
+                  <button 
+                    onClick={() => setShowWeeBookingModal(true)}
+                    className="w-full py-3 bg-white text-rose-700 font-extrabold rounded-xl shadow hover:bg-rose-50 transition text-xs"
+                  >
+                    🔒 비밀 상담 신청하기
+                  </button>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3 text-xs">
+                  <h3 className="font-extrabold text-slate-900 text-sm">상담실 안내</h3>
+                  <div className="space-y-2 text-slate-600">
+                    <p>📍 <strong>위치:</strong> 본관 2층 Wee클래스 전문상담실</p>
+                    <p>⏰ <strong>운영 시간:</strong> 월~금 08:30 - 16:30 (점심시간 상시 상담 가능)</p>
+                    <p>👩‍🏫 <strong>담당 상담 교사:</strong> 교내 전문상담교사</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: MY PAGE */}
+            {activeTab === 'mypage' && (
+              <div className="space-y-4">
+                {/* Profile Card */}
+                <div className="p-5 bg-white rounded-3xl border border-slate-200 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-teal-100 text-teal-800 rounded-2xl flex items-center justify-center font-black text-lg">
+                      👤
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="font-black text-base text-slate-900">{currentUser.nickname}</h3>
+                        <span className="text-[10px] bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded-full font-bold">
+                          {currentUser.role}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400">{currentUser.email}</p>
+                    </div>
+                  </div>
+
+                  {/* Temperature Progress */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl space-y-2 border border-slate-200">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-700">풍생인 매너 온도</span>
+                      <span className="text-amber-600 font-mono text-sm">{currentUser.temperature}℃</span>
+                    </div>
+
+                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-gradient-to-r from-teal-500 to-amber-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (currentUser.temperature / 50) * 100)}%` }}
+                      />
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 text-right">현재 등급: <strong>{userBadge.emoji} {userBadge.title}</strong></p>
+                  </div>
+                </div>
+
+                {/* Profanity Filter Settings */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3 shadow-sm">
+                  <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-teal-600" />
+                    <span>비속어 검열 세팅 (MOD-01)</span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button 
+                      onClick={() => { setProfanityFilterMode('BLOCK'); triggerToast('비속어 사전 차단 모드가 설정되었습니다.', 'info'); }}
+                      className={`p-3 rounded-xl border font-bold text-center transition ${
+                        profanityFilterMode === 'BLOCK' ? 'bg-teal-600 text-white border-teal-600' : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      🛡️ 즉시 차단
+                    </button>
+                    <button 
+                      onClick={() => { setProfanityFilterMode('MASK'); triggerToast('*** 마스킹 모드가 설정되었습니다.', 'info'); }}
+                      className={`p-3 rounded-xl border font-bold text-center transition ${
+                        profanityFilterMode === 'MASK' ? 'bg-teal-600 text-white border-teal-600' : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      *** 자동 마스킹
+                    </button>
+                  </div>
+                </div>
+
+                {/* Badges Shelf */}
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3 shadow-sm">
+                  <h3 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-amber-500" />
+                    <span>보유 멘토 배지</span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {currentUser.badges.map(b => (
+                      <div key={b.id} className="p-3 bg-amber-50/50 border border-amber-200 rounded-xl space-y-1">
+                        <span className="text-lg">{b.emoji}</span>
+                        <h4 className="font-extrabold text-xs text-amber-900">{b.name}</h4>
+                        <p className="text-[10px] text-amber-700">{b.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BOTTOM NAVIGATION BAR */}
+        {!activeRoomId && (
+          <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white/95 backdrop-blur-md border-t border-slate-200 py-2 px-3 flex items-center justify-around z-30 shadow-lg">
+            <button 
+              onClick={() => setActiveTab('home')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+                activeTab === 'home' ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Home className="w-5 h-5" />
+              <span>홈</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('chats')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+                activeTab === 'chats' ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span>대화방</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('lostfound')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+                activeTab === 'lostfound' ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <SearchCode className="w-5 h-5" />
+              <span>분실물</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('wee')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+                activeTab === 'wee' ? 'text-rose-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Phone className="w-5 h-5" />
+              <span>Wee클래스</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('mypage')}
+              className={`flex flex-col items-center gap-1 text-[10px] font-bold transition ${
+                activeTab === 'mypage' ? 'text-teal-600' : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <User className="w-5 h-5" />
+              <span>마이</span>
+            </button>
+          </nav>
+        )}
+
+        {/* ========================================================= */}
+        {/* GLOBAL MODALS & DIALOGS */}
+        {/* ========================================================= */}
+
+        {/* MODAL: CREATE ROOM */}
+        {showCreateModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-1.5">
+                  <Plus className="w-5 h-5 text-teal-600" />
+                  <span>새 대화방 개설</span>
+                </h3>
+                <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateRoom} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">대화방 카테고리</label>
+                  <select 
+                    value={newRoomCategory}
+                    onChange={(e) => setNewRoomCategory(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-800"
+                  >
+                    {Object.values(CATEGORIES).map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        [{cat.name}] - {cat.desc} (최대 {cat.max}명)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">대화방 제목</label>
+                  <input 
+                    type="text" 
+                    value={newRoomTitle}
+                    onChange={(e) => setNewRoomTitle(e.target.value)}
+                    placeholder="고민이나 질문 주제를 작성해 주세요" 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-teal-500" 
+                    required
+                  />
+                </div>
+
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800">
+                  ⏱️ <strong>자동 폭파 안내:</strong> 고민상담방은 48시간, 그 외 다인원 그룹방은 120시간동안 새 메시지가 없으면 자동 파기됩니다.
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs shadow-lg transition"
+                >
+                  대화방 개설하기 🚀
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: TARGET USER PROFILE & PEER TEMPERATURE RATING */}
+        {showUserProfileModal && targetProfileUser && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-teal-200">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-1.5">
+                  <User className="w-5 h-5 text-teal-600" />
+                  <span>상대방 익명 프로필</span>
+                </h3>
+                <button onClick={() => setShowUserProfileModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-black text-sm text-slate-900">{targetProfileUser.nickname}</h4>
+                    <p className="text-[10px] text-slate-400">{targetProfileUser.role}</p>
+                  </div>
+                  <span className="text-amber-600 font-mono font-bold text-sm bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl">
+                    🌡️ {targetProfileUser.temperature}℃
+                  </span>
+                </div>
+
+                <p className="text-[10px] text-slate-500">
+                  🔒 DB strict data isolation으로 사용자의 본명과 이메일은 절대 노출되지 않습니다.
+                </p>
+              </div>
+
+              {/* RATING BUTTONS */}
+              <div className="space-y-2">
+                <h4 className="font-extrabold text-xs text-slate-700 flex items-center gap-1">
+                  <ThumbsUp className="w-3.5 h-3.5 text-teal-600" />
+                  <span>풍생인 매너 온도 평가하기</span>
+                </h4>
+
+                {isRatingUnlocked ? (
+                  <div className="space-y-1.5">
+                    <button 
+                      onClick={() => handleProfileRating(0.1, '친절하고 따뜻해요')}
+                      className="w-full p-2.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl text-xs font-bold text-teal-800 text-left flex items-center justify-between transition"
+                    >
+                      <span>"친절하고 따뜻해요"</span>
+                      <span className="text-teal-600 font-mono">+0.1℃</span>
+                    </button>
+
+                    <button 
+                      onClick={() => handleProfileRating(0.2, '문제 해결/학업에 큰 도움이 됐어요')}
+                      className="w-full p-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-xs font-bold text-blue-800 text-left flex items-center justify-between transition"
+                    >
+                      <span>"문제 해결/학업에 큰 도움이 됐어요"</span>
+                      <span className="text-blue-600 font-mono">+0.2℃</span>
+                    </button>
+
+                    <button 
+                      onClick={() => handleProfileRating(0.3, '최고의 멘토예요')}
+                      className="w-full p-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-bold text-purple-800 text-left flex items-center justify-between transition"
+                    >
+                      <span>"최고의 멘토예요"</span>
+                      <span className="text-purple-600 font-mono">+0.3℃</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl text-[11px] text-slate-500 space-y-1">
+                    <p className="font-bold text-slate-700">🔒 평가 잠금 상태</p>
+                    <p>어뷰징 방지를 위해 대화방 내에서 메시지가 <strong>최소 5회 이상</strong> 오간 후 온도를 평가할 수 있습니다. (현재 대화: {userMessageCountInActiveRoom}회)</p>
+                  </div>
+                )}
+              </div>
+
+              <button 
+                onClick={() => setShowUserProfileModal(false)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: 1-SECOND QUICK MENTOR MATCH */}
+        {showMatchModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-blue-200">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <Zap className="w-5 h-5" />
+                  <h3 className="font-extrabold text-base text-slate-900">과목별 1초 멘토 매칭</h3>
+                </div>
+                <button onClick={() => setShowMatchModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">질문 과목 선택</label>
+                  <select 
+                    value={matchSubject} 
+                    onChange={(e) => setMatchSubject(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 font-bold"
+                  >
+                    <option value="수학II">수학II (미분/적분)</option>
+                    <option value="영어I">영어I (구문/독해)</option>
+                    <option value="통합과학">통합과학 (물리/화학)</option>
+                    <option value="정보/코딩">정보 (Python/C언어)</option>
+                  </select>
+                </div>
+
+                <div className="p-3 bg-blue-50 text-blue-800 rounded-xl text-xs space-y-1">
+                  <p className="font-bold">✨ 매칭 시스템 안내</p>
+                  <p className="text-[11px] text-blue-700">매칭 버튼을 누르면 해당 과목의 열정 멘토와 즉시 1:1 비밀 질의응답방이 생성됩니다.</p>
+                </div>
+
+                <button 
+                  onClick={handleStartQuickMatch}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs shadow-lg transition flex items-center justify-center gap-1.5"
+                >
+                  <span>1초 멘토 매칭 시작하기</span>
+                  <Zap className="w-4 h-4 fill-current" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: PROFANITY WARNING */}
+        {showProfanityWarningModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-rose-200 text-center">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900">부적절한 표현 감지</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  비속어 또는 변형/우회된 표현이 감지되어 메시지 전송이 차단되었습니다.
+                </p>
+              </div>
+
+              {detectedBadWords.length > 0 && (
+                <div className="p-2.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-mono font-bold">
+                  감지된 단어: {detectedBadWords.join(', ')}
+                </div>
+              )}
+
+              <button 
+                onClick={() => setShowProfanityWarningModal(false)}
+                className="w-full py-2.5 bg-rose-600 text-white font-extrabold rounded-xl text-xs shadow transition"
+              >
+                확인 및 수정하기
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: LONG PRESS MESSAGE ACTIONS */}
+        {showMsgActionModal && selectedMsgForAction && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl">
+              <h3 className="font-extrabold text-xs text-slate-400 border-b pb-2">메시지 옵션</h3>
+
+              {selectedMsgForAction.sender === currentUser.nickname ? (
+                <>
+                  <button 
+                    onClick={() => {
+                      setShowMsgActionModal(false);
+                      setEditMsgText(selectedMsgForAction.text);
+                      setShowEditMsgModal(true);
+                    }}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>메시지 수정</span>
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setRooms(prev => prev.map(r => r.id === activeRoomId ? {
+                        ...r,
+                        messages: r.messages.filter(m => m.id !== selectedMsgForAction.id)
+                      } : r));
+                      setShowMsgActionModal(false);
+                      triggerToast('메시지가 삭제되었습니다.', 'info');
+                    }}
+                    className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>메시지 삭제</span>
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setShowMsgActionModal(false);
+                    setShowReportModal(true);
+                  }}
+                  className="w-full py-2.5 bg-rose-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow"
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>이 메시지 신고하기</span>
+                </button>
+              )}
+
+              <button onClick={() => setShowMsgActionModal(false)} className="w-full py-2 bg-slate-50 text-slate-500 font-bold rounded-xl text-xs">
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: EDIT MESSAGE */}
+        {showEditMsgModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+              <h3 className="font-extrabold text-base text-slate-900">메시지 수정</h3>
+
+              <input 
+                type="text" 
+                value={editMsgText} 
+                onChange={(e) => setEditMsgText(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-900"
+              />
+
+              <div className="flex gap-2">
+                <button onClick={() => setShowEditMsgModal(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs">취소</button>
+                <button 
+                  onClick={() => {
+                    const { cleanText, isFiltered, foundWords } = filterText(editMsgText);
+                    if (isFiltered && profanityFilterMode === 'BLOCK') {
+                      setDetectedBadWords(foundWords);
+                      setShowProfanityWarningModal(true);
+                      return;
+                    }
+                    setRooms(prev => prev.map(r => r.id === activeRoomId ? {
+                      ...r,
+                      messages: r.messages.map(m => m.id === selectedMsgForAction.id ? { ...m, text: cleanText + ' (수정됨)' } : m)
+                    } : r));
+                    setShowEditMsgModal(false);
+                    triggerToast('메시지가 수정되었습니다.', 'success');
+                  }}
+                  className="flex-1 py-2.5 bg-teal-600 text-white font-bold rounded-xl text-xs shadow"
+                >
+                  수정 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: REPORT USER/MESSAGE */}
+        {showReportModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-extrabold text-base text-rose-600 flex items-center gap-1">
+                  <ShieldAlert className="w-5 h-5" />
+                  <span>실시간 사용자 신고</span>
+                </h3>
+                <button onClick={() => setShowReportModal(false)} className="text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-700">신고 사유 선택</label>
+                <select 
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 font-bold"
+                >
+                  <option value="욕설/비하">욕설 및 비하 발언</option>
+                  <option value="개인정보 요구/유출">개인정보 요구 또는 유출</option>
+                  <option value="부적절한 홍보">부적절한 홍보/음란성</option>
+                  <option value="기타">기타 타인 비방</option>
+                </select>
+
+                <p className="text-[10px] text-slate-400">
+                  ⚠️ 허위 신고 시 이용 제한 조치를 받을 수 있으며 누적 3회 신고 시 접근이 차단됩니다.
+                </p>
+
+                <button 
+                  onClick={() => {
+                    setShowReportModal(false);
+                    triggerToast('🚨 신고가 접수되었습니다. 즉시 모니터링 검토가 진행됩니다.', 'warning');
+                  }}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl text-xs shadow transition"
+                >
+                  신고 제출하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: WEE CLASS SECRET BOOKING */}
+        {showWeeBookingModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-rose-200">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-extrabold text-base text-rose-700 flex items-center gap-1.5">
+                  <Phone className="w-5 h-5" />
+                  <span>Wee클래스 비밀 상담 신청</span>
+                </h3>
+                <button onClick={() => setShowWeeBookingModal(false)} className="text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">상담 희망 일시</label>
+                  <input type="datetime-local" className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs font-bold text-slate-800" />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">고민 내용 (비밀 보장)</label>
+                  <textarea rows={3} placeholder="선생님께 전달할 고민을 편하게 적어주세요." className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs text-slate-800" />
+                </div>
+
+                <button 
+                  onClick={() => {
+                    setShowWeeBookingModal(false);
+                    triggerToast('💌 Wee클래스 비밀 상담이 신청되었습니다. 담당 선생님께서 메일로 안내드립니다.', 'success');
+                  }}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-xl text-xs shadow transition"
+                >
+                  비밀 상담 접수하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: POST LOST ITEM */}
+        {showLostPostModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h3 className="font-extrabold text-base text-slate-900">분실물 등록</h3>
+                <button onClick={() => setShowLostPostModal(false)} className="text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">습득물 제목</label>
+                  <input 
+                    type="text" 
+                    value={lostForm.title}
+                    onChange={(e) => setLostForm({ ...lostForm, title: e.target.value })}
+                    placeholder="예: 2층 중앙 계단에서 분실된 필통 주웠습니다" 
+                    className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">습득 장소</label>
+                  <input 
+                    type="text" 
+                    value={lostForm.location}
+                    onChange={(e) => setLostForm({ ...lostForm, location: e.target.value })}
+                    placeholder="예: 본관 2층 체육관 입구" 
+                    className="w-full bg-slate-50 border rounded-xl p-2.5 text-xs" 
+                  />
+                </div>
+
+                <button 
+                  onClick={() => {
+                    if (!lostForm.title) return;
+                    setLostItems([{
+                      id: `l-${Date.now()}`,
+                      title: lostForm.title,
+                      location: lostForm.location || '교내 지정장소',
+                      date: '방금 전',
+                      status: '보관중'
+                    }, ...lostItems]);
+                    setShowLostPostModal(false);
+                    setLostForm({ title: '', location: '', date: '' });
+                    triggerToast('습득물이 성공적으로 등록되었습니다.', 'success');
+                  }}
+                  className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-extrabold rounded-xl text-xs shadow transition"
+                >
+                  등록 완료
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
